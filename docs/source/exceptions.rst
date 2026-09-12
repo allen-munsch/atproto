@@ -19,10 +19,28 @@ Client
    :show-inheritance:
 
 
+Subscription
+############
+
+.. automodule:: atproto_subscription.exceptions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
 Firehose
 ########
 
 .. automodule:: atproto_firehose.exceptions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+Jetstream
+#########
+
+.. automodule:: atproto_jetstream.exceptions
    :members:
    :undoc-members:
    :show-inheritance:

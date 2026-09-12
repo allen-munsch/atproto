@@ -7,14 +7,13 @@
 
 import typing as t
 
-import typing_extensions as te
 from pydantic import Field
 
 from atproto_client.models import string_formats
 
 if t.TYPE_CHECKING:
     from atproto_client import models
-from atproto_client.models import base
+from atproto_client.models import base, unknown_union
 
 
 class ConvoView(base.ModelBase):
@@ -23,9 +22,8 @@ class ConvoView(base.ModelBase):
     id: str  #: Id.
     rev: str  #: Rev.
     kind: t.Optional[
-        te.Annotated[
-            t.Union['models.ChatBskyModerationDefs.DirectConvo', 'models.ChatBskyModerationDefs.GroupConvo'],
-            Field(discriminator='py_type'),
+        unknown_union.OpenUnion[
+            t.Union['models.ChatBskyModerationDefs.DirectConvo', 'models.ChatBskyModerationDefs.GroupConvo']
         ]
     ] = None  #: Union field that has data specific to different kinds of convos.
 
@@ -50,7 +48,7 @@ class GroupConvo(base.ModelBase):
     lock_status: 'models.ChatBskyConvoDefs.ConvoLockStatus'  #: The lock status of the conversation.
     member_count: int  #: The total number of members in the group conversation.
     member_limit: int  #: The maximum number of members allowed in the group conversation.
-    name: str = Field(max_length=1280)  #: The display name of the group conversation.
+    name: str = Field(max_length=500)  #: The display name of the group conversation.
     join_link: t.Optional['models.ChatBskyGroupDefs.JoinLinkView'] = None  #: Join link.
 
     py_type: t.Literal['chat.bsky.moderation.defs#groupConvo'] = Field(

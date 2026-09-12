@@ -8,17 +8,16 @@
 import typing as t
 
 import typing_extensions as te
-from pydantic import Field
 
 if t.TYPE_CHECKING:
     from atproto_client import models
-from atproto_client.models import base
+from atproto_client.models import base, unknown_union
 
 
 class Data(base.DataModelBase):
     """Input data model for :obj:`tools.ozone.report.createActivity`."""
 
-    activity: te.Annotated[
+    activity: unknown_union.OpenUnion[
         t.Union[
             'models.ToolsOzoneReportDefs.QueueActivity',
             'models.ToolsOzoneReportDefs.AssignmentActivity',
@@ -26,19 +25,23 @@ class Data(base.DataModelBase):
             'models.ToolsOzoneReportDefs.CloseActivity',
             'models.ToolsOzoneReportDefs.ReopenActivity',
             'models.ToolsOzoneReportDefs.NoteActivity',
-        ],
-        Field(discriminator='py_type'),
+        ]
     ]  #: The type of activity to record.
-    report_id: int  #: ID of the report to record activity on.
+    event_id: t.Optional[int] = (
+        None  #: ID of the report moderation event. Resolves to the report created from that event. Exactly one of reportId or eventId must be provided.
+    )
     internal_note: t.Optional[str] = None  #: Optional moderator-only note. Not visible to reporters.
     is_automated: t.Optional[bool] = (
         False  #: Set true when this activity is triggered by an automated process. Defaults to false.
     )
     public_note: t.Optional[str] = None  #: Optional public-facing note, potentially visible to the reporter.
+    report_id: t.Optional[int] = (
+        None  #: ID of the report to record activity on. Exactly one of reportId or eventId must be provided.
+    )
 
 
 class DataDict(t.TypedDict):
-    activity: te.Annotated[
+    activity: unknown_union.OpenUnion[
         t.Union[
             'models.ToolsOzoneReportDefs.QueueActivity',
             'models.ToolsOzoneReportDefs.AssignmentActivity',
@@ -46,15 +49,19 @@ class DataDict(t.TypedDict):
             'models.ToolsOzoneReportDefs.CloseActivity',
             'models.ToolsOzoneReportDefs.ReopenActivity',
             'models.ToolsOzoneReportDefs.NoteActivity',
-        ],
-        Field(discriminator='py_type'),
+        ]
     ]  #: The type of activity to record.
-    report_id: int  #: ID of the report to record activity on.
+    event_id: te.NotRequired[
+        t.Optional[int]
+    ]  #: ID of the report moderation event. Resolves to the report created from that event. Exactly one of reportId or eventId must be provided.
     internal_note: te.NotRequired[t.Optional[str]]  #: Optional moderator-only note. Not visible to reporters.
     is_automated: te.NotRequired[
         t.Optional[bool]
     ]  #: Set true when this activity is triggered by an automated process. Defaults to false.
     public_note: te.NotRequired[t.Optional[str]]  #: Optional public-facing note, potentially visible to the reporter.
+    report_id: te.NotRequired[
+        t.Optional[int]
+    ]  #: ID of the report to record activity on. Exactly one of reportId or eventId must be provided.
 
 
 class Response(base.ResponseModelBase):

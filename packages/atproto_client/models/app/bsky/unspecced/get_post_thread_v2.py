@@ -14,7 +14,7 @@ from atproto_client.models import string_formats
 
 if t.TYPE_CHECKING:
     from atproto_client import models
-from atproto_client.models import base
+from atproto_client.models import base, unknown_union
 
 
 class Params(base.ParamsModelBase):
@@ -28,9 +28,7 @@ class Params(base.ParamsModelBase):
     branching_factor: te.Annotated[t.Optional[int], Field(ge=0, le=100)] = (
         None  #: Maximum of replies to include at each level of the thread, except for the direct replies to the anchor, which are (NOTE: currently, during unspecced phase) all returned (NOTE: later they might be paginated).
     )
-    sort: t.Optional[t.Union[t.Literal['newest'], t.Literal['oldest'], t.Literal['top'], str]] = (
-        'oldest'  #: Sorting for the thread replies.
-    )
+    sort: t.Optional[t.Union[t.Literal['newest', 'oldest', 'top'], str]] = 'oldest'  #: Sorting for the thread replies.
 
 
 class ParamsDict(t.TypedDict):
@@ -41,7 +39,7 @@ class ParamsDict(t.TypedDict):
         t.Optional[int]
     ]  #: Maximum of replies to include at each level of the thread, except for the direct replies to the anchor, which are (NOTE: currently, during unspecced phase) all returned (NOTE: later they might be paginated).
     sort: te.NotRequired[
-        t.Optional[t.Union[t.Literal['newest'], t.Literal['oldest'], t.Literal['top'], str]]
+        t.Optional[t.Union[t.Literal['newest', 'oldest', 'top'], str]]
     ]  #: Sorting for the thread replies.
 
 
@@ -60,14 +58,13 @@ class ThreadItem(base.ModelBase):
 
     depth: int  #: The nesting level of this item in the thread. Depth 0 means the anchor item. Items above have negative depths, items below have positive depths.
     uri: string_formats.AtUri  #: Uri.
-    value: te.Annotated[
+    value: unknown_union.OpenUnion[
         t.Union[
             'models.AppBskyUnspeccedDefs.ThreadItemPost',
             'models.AppBskyUnspeccedDefs.ThreadItemNoUnauthenticated',
             'models.AppBskyUnspeccedDefs.ThreadItemNotFound',
             'models.AppBskyUnspeccedDefs.ThreadItemBlocked',
-        ],
-        Field(discriminator='py_type'),
+        ]
     ]  #: Value.
 
     py_type: t.Literal['app.bsky.unspecced.getPostThreadV2#threadItem'] = Field(

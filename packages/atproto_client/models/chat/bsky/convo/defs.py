@@ -7,22 +7,19 @@
 
 import typing as t
 
-import typing_extensions as te
 from pydantic import Field
 
 from atproto_client.models import string_formats
 
 if t.TYPE_CHECKING:
     from atproto_client import models
-from atproto_client.models import base
+from atproto_client.models import base, unknown_union
 
-ConvoKind = t.Union[t.Literal['direct'], t.Literal['group'], str]  #: Convo kind
+ConvoKind = t.Union[t.Literal['direct', 'group'], str]  #: Convo kind
 
-ConvoLockStatus = t.Union[
-    t.Literal['unlocked'], t.Literal['locked'], t.Literal['locked-permanently'], str
-]  #: Convo lock status
+ConvoLockStatus = t.Union[t.Literal['unlocked', 'locked', 'locked-permanently'], str]  #: Convo lock status
 
-ConvoStatus = t.Union[t.Literal['request'], t.Literal['accepted'], str]  #: Convo status
+ConvoStatus = t.Union[t.Literal['request', 'accepted'], str]  #: Convo status
 
 
 class ConvoRef(base.ModelBase):
@@ -53,10 +50,7 @@ class MessageInput(base.ModelBase):
 
     text: str = Field(max_length=10000)  #: Text.
     embed: t.Optional[
-        te.Annotated[
-            t.Union['models.AppBskyEmbedRecord.Main', 'models.ChatBskyEmbedJoinLink.Main'],
-            Field(discriminator='py_type'),
-        ]
+        unknown_union.OpenUnion[t.Union['models.AppBskyEmbedRecord.Main', 'models.ChatBskyEmbedJoinLink.Main']]
     ] = None  #: Embed.
     facets: t.Optional[t.List['models.AppBskyRichtextFacet.Main']] = (
         None  #: Annotations of text (mentions, URLs, hashtags, etc).
@@ -89,10 +83,7 @@ class MessageView(base.ModelBase):
     sent_at: string_formats.DateTime  #: Sent at.
     text: str = Field(max_length=10000)  #: Text.
     embed: t.Optional[
-        te.Annotated[
-            t.Union['models.AppBskyEmbedRecord.View', 'models.ChatBskyEmbedJoinLink.View'],
-            Field(discriminator='py_type'),
-        ]
+        unknown_union.OpenUnion[t.Union['models.AppBskyEmbedRecord.View', 'models.ChatBskyEmbedJoinLink.View']]
     ] = None  #: Embed.
     facets: t.Optional[t.List['models.AppBskyRichtextFacet.Main']] = (
         None  #: Annotations of text (mentions, URLs, hashtags, etc).
@@ -101,13 +92,12 @@ class MessageView(base.ModelBase):
         None  #: Reactions to this message, in ascending order of creation time.
     )
     reply_to: t.Optional[
-        te.Annotated[
+        unknown_union.OpenUnion[
             t.Union[
                 'models.ChatBskyConvoDefs.MessageView',
                 'models.ChatBskyConvoDefs.DeletedMessageView',
                 'models.ChatBskyConvoDefs.MessageBeforeUserJoinedGroupView',
-            ],
-            Field(discriminator='py_type'),
+            ]
         ]
     ] = None  #: If set, the message this message is replying to. The full view of the referenced message is embedded so the client can render it inline. Only a single level is embedded: the embedded message will not itself have a populated 'replyTo' field even if it was also a reply.
 
@@ -129,7 +119,7 @@ class SystemMessageReferredUser(base.ModelBase):
 class SystemMessageView(base.ModelBase):
     """Definition model for :obj:`chat.bsky.convo.defs`."""
 
-    data: te.Annotated[
+    data: unknown_union.OpenUnion[
         t.Union[
             'models.ChatBskyConvoDefs.SystemMessageDataAddMember',
             'models.ChatBskyConvoDefs.SystemMessageDataRemoveMember',
@@ -143,8 +133,7 @@ class SystemMessageView(base.ModelBase):
             'models.ChatBskyConvoDefs.SystemMessageDataEditJoinLink',
             'models.ChatBskyConvoDefs.SystemMessageDataEnableJoinLink',
             'models.ChatBskyConvoDefs.SystemMessageDataDisableJoinLink',
-        ],
-        Field(discriminator='py_type'),
+        ]
     ]  #: Data.
     id: str  #: Id.
     rev: str  #: Rev.
@@ -352,24 +341,20 @@ class ConvoView(base.ModelBase):
     rev: str  #: Rev.
     unread_count: int  #: Unread count.
     kind: t.Optional[
-        te.Annotated[
-            t.Union['models.ChatBskyConvoDefs.DirectConvo', 'models.ChatBskyConvoDefs.GroupConvo'],
-            Field(discriminator='py_type'),
-        ]
+        unknown_union.OpenUnion[t.Union['models.ChatBskyConvoDefs.DirectConvo', 'models.ChatBskyConvoDefs.GroupConvo']]
     ] = None  #: Union field that has data specific to different kinds of convos.
     last_message: t.Optional[
-        te.Annotated[
+        unknown_union.OpenUnion[
             t.Union[
                 'models.ChatBskyConvoDefs.MessageView',
                 'models.ChatBskyConvoDefs.DeletedMessageView',
                 'models.ChatBskyConvoDefs.SystemMessageView',
-            ],
-            Field(discriminator='py_type'),
+            ]
         ]
     ] = None  #: Last message.
-    last_reaction: t.Optional[
-        te.Annotated[t.Union['models.ChatBskyConvoDefs.MessageAndReactionView'], Field(discriminator='py_type')]
-    ] = None  #: Last reaction.
+    last_reaction: t.Optional[unknown_union.OpenUnion['models.ChatBskyConvoDefs.MessageAndReactionView']] = (
+        None  #: Last reaction.
+    )
     status: t.Optional['models.ChatBskyConvoDefs.ConvoStatus'] = (
         None  #: Convo status for the viewer member (not the convo itself).
     )
@@ -395,7 +380,7 @@ class GroupConvo(base.ModelBase):
     lock_status_moderation_override: bool  #: Whether the lock status is being forced by a moderation override (account inactivation or convo takedown) rather than the owner's own setting.
     member_count: int  #: The total number of members in the group conversation.
     member_limit: int  #: The maximum number of members allowed in the group conversation.
-    name: str = Field(max_length=1280)  #: The display name of the group conversation.
+    name: str = Field(max_length=500)  #: The display name of the group conversation.
     join_link: t.Optional['models.ChatBskyGroupDefs.JoinLinkView'] = None  #: Join link.
     join_request_count: t.Optional[int] = (
         None  #: The total number of pending join requests for the group conversation. Only present for the owner. Capped at 21.
@@ -468,9 +453,8 @@ class LogCreateMessage(base.ModelBase):
     """Definition model for :obj:`chat.bsky.convo.defs`. Event indicating a user-originated message was created. Is not emitted for system messages."""
 
     convo_id: str  #: Convo id.
-    message: te.Annotated[
-        t.Union['models.ChatBskyConvoDefs.MessageView', 'models.ChatBskyConvoDefs.DeletedMessageView'],
-        Field(discriminator='py_type'),
+    message: unknown_union.OpenUnion[
+        t.Union['models.ChatBskyConvoDefs.MessageView', 'models.ChatBskyConvoDefs.DeletedMessageView']
     ]  #: Message.
     rev: str  #: Rev.
     related_profiles: t.Optional[t.List['models.ChatBskyActorDefs.ProfileViewBasic']] = (
@@ -486,9 +470,8 @@ class LogDeleteMessage(base.ModelBase):
     """Definition model for :obj:`chat.bsky.convo.defs`. Event indicating a user-originated message was deleted. Is not emitted for system messages."""
 
     convo_id: str  #: Convo id.
-    message: te.Annotated[
-        t.Union['models.ChatBskyConvoDefs.MessageView', 'models.ChatBskyConvoDefs.DeletedMessageView'],
-        Field(discriminator='py_type'),
+    message: unknown_union.OpenUnion[
+        t.Union['models.ChatBskyConvoDefs.MessageView', 'models.ChatBskyConvoDefs.DeletedMessageView']
     ]  #: Message.
     rev: str  #: Rev.
 
@@ -501,13 +484,12 @@ class LogReadMessage(base.ModelBase):
     """Definition model for :obj:`chat.bsky.convo.defs`. DEPRECATED: use logReadConvo instead. Event indicating a convo was read up to a certain message."""
 
     convo_id: str  #: Convo id.
-    message: te.Annotated[
+    message: unknown_union.OpenUnion[
         t.Union[
             'models.ChatBskyConvoDefs.MessageView',
             'models.ChatBskyConvoDefs.DeletedMessageView',
             'models.ChatBskyConvoDefs.SystemMessageView',
-        ],
-        Field(discriminator='py_type'),
+        ]
     ]  #: Message.
     rev: str  #: Rev.
 
@@ -520,9 +502,8 @@ class LogAddReaction(base.ModelBase):
     """Definition model for :obj:`chat.bsky.convo.defs`. Event indicating a reaction was added to a message."""
 
     convo_id: str  #: Convo id.
-    message: te.Annotated[
-        t.Union['models.ChatBskyConvoDefs.MessageView', 'models.ChatBskyConvoDefs.DeletedMessageView'],
-        Field(discriminator='py_type'),
+    message: unknown_union.OpenUnion[
+        t.Union['models.ChatBskyConvoDefs.MessageView', 'models.ChatBskyConvoDefs.DeletedMessageView']
     ]  #: Message.
     reaction: 'models.ChatBskyConvoDefs.ReactionView'  #: Reaction.
     rev: str  #: Rev.
@@ -539,9 +520,8 @@ class LogRemoveReaction(base.ModelBase):
     """Definition model for :obj:`chat.bsky.convo.defs`. Event indicating a reaction was removed from a message."""
 
     convo_id: str  #: Convo id.
-    message: te.Annotated[
-        t.Union['models.ChatBskyConvoDefs.MessageView', 'models.ChatBskyConvoDefs.DeletedMessageView'],
-        Field(discriminator='py_type'),
+    message: unknown_union.OpenUnion[
+        t.Union['models.ChatBskyConvoDefs.MessageView', 'models.ChatBskyConvoDefs.DeletedMessageView']
     ]  #: Message.
     reaction: 'models.ChatBskyConvoDefs.ReactionView'  #: Reaction.
     rev: str  #: Rev.
@@ -558,13 +538,12 @@ class LogReadConvo(base.ModelBase):
     """Definition model for :obj:`chat.bsky.convo.defs`. Event indicating a convo was read up to a certain message."""
 
     convo_id: str  #: Convo id.
-    message: te.Annotated[
+    message: unknown_union.OpenUnion[
         t.Union[
             'models.ChatBskyConvoDefs.MessageView',
             'models.ChatBskyConvoDefs.DeletedMessageView',
             'models.ChatBskyConvoDefs.SystemMessageView',
-        ],
-        Field(discriminator='py_type'),
+        ]
     ]  #: Message.
     rev: str  #: Rev.
 

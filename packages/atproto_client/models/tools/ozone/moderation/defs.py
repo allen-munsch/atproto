@@ -15,7 +15,7 @@ from atproto_client.models import string_formats
 if t.TYPE_CHECKING:
     from atproto_client import models
     from atproto_client.models.unknown_type import UnknownType
-from atproto_client.models import base
+from atproto_client.models import base, unknown_union
 
 
 class ModEventView(base.ModelBase):
@@ -23,7 +23,7 @@ class ModEventView(base.ModelBase):
 
     created_at: string_formats.DateTime  #: Created at.
     created_by: string_formats.Did  #: Created by.
-    event: te.Annotated[
+    event: unknown_union.OpenUnion[
         t.Union[
             'models.ToolsOzoneModerationDefs.ModEventTakedown',
             'models.ToolsOzoneModerationDefs.ModEventReverseTakedown',
@@ -50,18 +50,16 @@ class ModEventView(base.ModelBase):
             'models.ToolsOzoneModerationDefs.RevokeAccountCredentialsEvent',
             'models.ToolsOzoneModerationDefs.ScheduleTakedownEvent',
             'models.ToolsOzoneModerationDefs.CancelScheduledTakedownEvent',
-        ],
-        Field(discriminator='py_type'),
+        ]
     ]  #: Event.
     id: int  #: Id.
-    subject: te.Annotated[
+    subject: unknown_union.OpenUnion[
         t.Union[
             'models.ComAtprotoAdminDefs.RepoRef',
             'models.ComAtprotoRepoStrongRef.Main',
             'models.ChatBskyConvoDefs.MessageRef',
             'models.ChatBskyConvoDefs.ConvoRef',
-        ],
-        Field(discriminator='py_type'),
+        ]
     ]  #: Subject.
     subject_blob_cids: t.List[str]  #: Subject blob cids.
     creator_handle: t.Optional[str] = None  #: Creator handle.
@@ -78,7 +76,7 @@ class ModEventViewDetail(base.ModelBase):
 
     created_at: string_formats.DateTime  #: Created at.
     created_by: string_formats.Did  #: Created by.
-    event: te.Annotated[
+    event: unknown_union.OpenUnion[
         t.Union[
             'models.ToolsOzoneModerationDefs.ModEventTakedown',
             'models.ToolsOzoneModerationDefs.ModEventReverseTakedown',
@@ -105,19 +103,17 @@ class ModEventViewDetail(base.ModelBase):
             'models.ToolsOzoneModerationDefs.RevokeAccountCredentialsEvent',
             'models.ToolsOzoneModerationDefs.ScheduleTakedownEvent',
             'models.ToolsOzoneModerationDefs.CancelScheduledTakedownEvent',
-        ],
-        Field(discriminator='py_type'),
+        ]
     ]  #: Event.
     id: int  #: Id.
-    subject: te.Annotated[
+    subject: unknown_union.OpenUnion[
         t.Union[
             'models.ToolsOzoneModerationDefs.RepoView',
             'models.ToolsOzoneModerationDefs.RepoViewNotFound',
             'models.ToolsOzoneModerationDefs.RecordView',
             'models.ToolsOzoneModerationDefs.RecordViewNotFound',
             'models.ToolsOzoneModerationDefs.ConvoView',
-        ],
-        Field(discriminator='py_type'),
+        ]
     ]  #: Subject.
     subject_blobs: t.List['models.ToolsOzoneModerationDefs.BlobView']  #: Subject blobs.
     mod_tool: t.Optional['models.ToolsOzoneModerationDefs.ModTool'] = None  #: Mod tool.
@@ -135,14 +131,13 @@ class SubjectStatusView(base.ModelBase):
     )  #: Timestamp referencing the first moderation status impacting event was emitted on the subject.
     id: int  #: Id.
     review_state: 'models.ToolsOzoneModerationDefs.SubjectReviewState'  #: Review state.
-    subject: te.Annotated[
+    subject: unknown_union.OpenUnion[
         t.Union[
             'models.ComAtprotoAdminDefs.RepoRef',
             'models.ComAtprotoRepoStrongRef.Main',
             'models.ChatBskyConvoDefs.MessageRef',
             'models.ChatBskyConvoDefs.ConvoRef',
-        ],
-        Field(discriminator='py_type'),
+        ]
     ]  #: Subject.
     updated_at: (
         string_formats.DateTime
@@ -153,17 +148,10 @@ class SubjectStatusView(base.ModelBase):
     account_strike: t.Optional['models.ToolsOzoneModerationDefs.AccountStrike'] = (
         None  #: Strike information for the account (account-level only).
     )
-    age_assurance_state: t.Optional[
-        t.Union[
-            t.Literal['pending'],
-            t.Literal['assured'],
-            t.Literal['unknown'],
-            t.Literal['reset'],
-            t.Literal['blocked'],
-            str,
-        ]
-    ] = None  #: Current age assurance state of the subject.
-    age_assurance_updated_by: t.Optional[t.Union[t.Literal['admin'], t.Literal['user'], str]] = (
+    age_assurance_state: t.Optional[t.Union[t.Literal['pending', 'assured', 'unknown', 'reset', 'blocked'], str]] = (
+        None  #: Current age assurance state of the subject.
+    )
+    age_assurance_updated_by: t.Optional[t.Union[t.Literal['admin', 'user'], str]] = (
         None  #: Whether or not the last successful update to age assurance was made by the user or admin.
     )
     appealed: t.Optional[bool] = (
@@ -171,9 +159,8 @@ class SubjectStatusView(base.ModelBase):
     )
     comment: t.Optional[str] = None  #: Sticky comment on the subject.
     hosting: t.Optional[
-        te.Annotated[
-            t.Union['models.ToolsOzoneModerationDefs.AccountHosting', 'models.ToolsOzoneModerationDefs.RecordHosting'],
-            Field(discriminator='py_type'),
+        unknown_union.OpenUnion[
+            t.Union['models.ToolsOzoneModerationDefs.AccountHosting', 'models.ToolsOzoneModerationDefs.RecordHosting']
         ]
     ] = None  #: Hosting.
     last_appealed_at: t.Optional[string_formats.DateTime] = (
@@ -303,7 +290,7 @@ class ModEventTakedown(base.ModelBase):
     strike_expires_at: t.Optional[string_formats.DateTime] = (
         None  #: When the strike should expire. If not provided, the strike never expires.
     )
-    target_services: t.Optional[t.List[t.Union[t.Literal['appview'], t.Literal['pds'], str]]] = (
+    target_services: t.Optional[t.List[t.Union[t.Literal['appview', 'pds'], str]]] = (
         None  #: List of services where the takedown should be applied. If empty or not provided, takedown is applied on all configured services.
     )
 
@@ -397,9 +384,7 @@ class AgeAssuranceEvent(base.ModelBase):
 
     attempt_id: str  #: The unique identifier for this instance of the age assurance flow, in UUID format.
     created_at: string_formats.DateTime  #: The date and time of this write operation.
-    status: t.Union[
-        t.Literal['unknown'], t.Literal['pending'], t.Literal['assured'], str
-    ]  #: The status of the Age Assurance process.
+    status: t.Union[t.Literal['unknown', 'pending', 'assured'], str]  #: The status of the Age Assurance process.
     access: t.Optional['models.AppBskyAgeassuranceDefs.Access'] = None  #: Access.
     complete_ip: t.Optional[str] = None  #: The IP address used when completing the AA flow.
     complete_ua: t.Optional[str] = None  #: The user agent used when completing the AA flow.
@@ -420,7 +405,7 @@ class AgeAssuranceOverrideEvent(base.ModelBase):
 
     comment: str = Field(min_length=1)  #: Comment describing the reason for the override.
     status: t.Union[
-        t.Literal['assured'], t.Literal['reset'], t.Literal['blocked'], str
+        t.Literal['assured', 'reset', 'blocked'], str
     ]  #: The status to be set for the user decided by a moderator, overriding whatever value the user had previously. Use reset to default to original state.
     access: t.Optional['models.AppBskyAgeassuranceDefs.Access'] = None  #: Access.
 
@@ -577,15 +562,7 @@ class AccountEvent(base.ModelBase):
     timestamp: string_formats.DateTime  #: Timestamp.
     comment: t.Optional[str] = None  #: Comment.
     status: t.Optional[
-        t.Union[
-            t.Literal['unknown'],
-            t.Literal['deactivated'],
-            t.Literal['deleted'],
-            t.Literal['takendown'],
-            t.Literal['suspended'],
-            t.Literal['tombstoned'],
-            str,
-        ]
+        t.Union[t.Literal['unknown', 'deactivated', 'deleted', 'takendown', 'suspended', 'tombstoned'], str]
     ] = None  #: Status.
 
     py_type: t.Literal['tools.ozone.moderation.defs#accountEvent'] = Field(
@@ -610,7 +587,7 @@ class IdentityEvent(base.ModelBase):
 class RecordEvent(base.ModelBase):
     """Definition model for :obj:`tools.ozone.moderation.defs`. Logs lifecycle event on a record subject. Normally captured by automod from the firehose and emitted to ozone for historical tracking."""
 
-    op: t.Union[t.Literal['create'], t.Literal['update'], t.Literal['delete'], str]  #: Op.
+    op: t.Union[t.Literal['create', 'update', 'delete'], str]  #: Op.
     timestamp: string_formats.DateTime  #: Timestamp.
     cid: t.Optional[string_formats.Cid] = None  #: Cid.
     comment: t.Optional[str] = None  #: Comment.
@@ -778,9 +755,8 @@ class BlobView(base.ModelBase):
     mime_type: str  #: Mime type.
     size: int  #: Size.
     details: t.Optional[
-        te.Annotated[
-            t.Union['models.ToolsOzoneModerationDefs.ImageDetails', 'models.ToolsOzoneModerationDefs.VideoDetails'],
-            Field(discriminator='py_type'),
+        unknown_union.OpenUnion[
+            t.Union['models.ToolsOzoneModerationDefs.ImageDetails', 'models.ToolsOzoneModerationDefs.VideoDetails']
         ]
     ] = None  #: Details.
     moderation: t.Optional['models.ToolsOzoneModerationDefs.Moderation'] = None  #: Moderation.
@@ -816,14 +792,7 @@ class VideoDetails(base.ModelBase):
 class AccountHosting(base.ModelBase):
     """Definition model for :obj:`tools.ozone.moderation.defs`."""
 
-    status: t.Union[
-        t.Literal['takendown'],
-        t.Literal['suspended'],
-        t.Literal['deleted'],
-        t.Literal['deactivated'],
-        t.Literal['unknown'],
-        str,
-    ]  #: Status.
+    status: t.Union[t.Literal['takendown', 'suspended', 'deleted', 'deactivated', 'unknown'], str]  #: Status.
     created_at: t.Optional[string_formats.DateTime] = None  #: Created at.
     deactivated_at: t.Optional[string_formats.DateTime] = None  #: Deactivated at.
     deleted_at: t.Optional[string_formats.DateTime] = None  #: Deleted at.
@@ -838,7 +807,7 @@ class AccountHosting(base.ModelBase):
 class RecordHosting(base.ModelBase):
     """Definition model for :obj:`tools.ozone.moderation.defs`."""
 
-    status: t.Union[t.Literal['deleted'], t.Literal['unknown'], str]  #: Status.
+    status: t.Union[t.Literal['deleted', 'unknown'], str]  #: Status.
     created_at: t.Optional[string_formats.DateTime] = None  #: Created at.
     deleted_at: t.Optional[string_formats.DateTime] = None  #: Deleted at.
     updated_at: t.Optional[string_formats.DateTime] = None  #: Updated at.
@@ -899,7 +868,7 @@ class ScheduledActionView(base.ModelBase):
     did: string_formats.Did  #: Subject DID for the action.
     id: int  #: Auto-incrementing row ID.
     status: t.Union[
-        t.Literal['pending'], t.Literal['executed'], t.Literal['cancelled'], t.Literal['failed'], str
+        t.Literal['pending', 'executed', 'cancelled', 'failed'], str
     ]  #: Current status of the scheduled action.
     event_data: t.Optional['UnknownType'] = (
         None  #: Serialized event object that will be propagated to the event when performed.

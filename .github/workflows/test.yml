@@ -28,11 +28,13 @@ jobs:
       - name: Checkout repository.
         uses: actions/checkout@v5
 
-      - name: Set up Python.
-        id: setup-python
+      # Poetry itself requires Python 3.10+, but the project is tested down to 3.9.
+      # Poetry is installed with its own interpreter and creates the venv with the active one.
+      - name: Set up Python for Poetry.
+        id: poetry-python
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.13'
 
       - name: Load cached Poetry installation.
         id: cached-poetry
@@ -40,17 +42,23 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.local
-          key: poetry-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-2.2.1  # bump the suffix to reset the cache
+          key: poetry-${{ runner.os }}-${{ steps.poetry-python.outputs.python-version }}-2.4.1  # bump the suffix to reset the cache
 
       - name: Setup Poetry.
         if: steps.cached-poetry.outputs.cache-hit != 'true'
         uses: snok/install-poetry@v1
         with:
-          version: 2.2.1
+          version: 2.4.1
 
       - name: Add Poetry to PATH.
         if: runner.os != 'Windows'
         run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Set up Python.
+        id: setup-python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Load cached venv.
         id: cached-venv
@@ -64,6 +72,75 @@ jobs:
       - name: Install dependencies.
         if: steps.cached-venv.outputs.cache-hit != 'true'
         run: poetry install --without docs
+
+      - name: Run Tests.
+        run: poetry run pytest
+
+      - name: Byte-compile the examples.
+        run: poetry run python -m compileall -q examples
+
+  websockets_compat:
+    name: websockets ${{matrix.websockets}} (${{matrix.os}}, py${{matrix.python-version}})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # One cell per (major, boundary): the oldest and newest Python each major supports.
+        # v15 is omitted because poetry.lock pins it, so unit_tests already covers it on every
+        # Python and OS. The OS is rotated so all three see a version the lockfile never installs.
+        include:
+          - { websockets: "16", python-version: "3.10", os: ubuntu-latest }  # v16 needs 3.10+
+          - { websockets: "16", python-version: "3.14", os: macos-latest }
+          - { websockets: "17", python-version: "3.11", os: ubuntu-latest }  # v17 needs 3.11+
+          - { websockets: "17", python-version: "3.14", os: windows-latest }
+
+    runs-on: ${{matrix.os}}
+
+    env:
+      POETRY_VIRTUALENVS_IN_PROJECT: "true"
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository.
+        uses: actions/checkout@v5
+
+      # Poetry itself requires Python 3.10+, but the project is tested down to 3.9.
+      # Poetry is installed with its own interpreter and creates the venv with the active one.
+      - name: Set up Python for Poetry.
+        id: poetry-python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Setup Poetry.
+        uses: snok/install-poetry@v1
+        with:
+          version: 2.4.1
+
+      - name: Add Poetry to PATH.
+        if: runner.os != 'Windows'
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Set up Python.
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{matrix.python-version}}
+
+      - name: Install dependencies.
+        run: poetry install --without docs
+
+      # Overrides the version poetry.lock pins. Fails loudly if the pin is unsatisfiable.
+      # The venv interpreter is invoked directly because `poetry run python` fails on Windows;
+      # POETRY_VIRTUALENVS_IN_PROJECT guarantees the venv is at .venv.
+      - name: Pin websockets to v${{matrix.websockets}}.
+        run: |
+          PYTHON=.venv/bin/python
+          [ -x "$PYTHON" ] || PYTHON=.venv/Scripts/python.exe
+          "$PYTHON" -m pip install "websockets~=${{matrix.websockets}}.0"
+          "$PYTHON" -c "import websockets; print('websockets', websockets.__version__)"
 
       - name: Run Tests.
         run: poetry run pytest

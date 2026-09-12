@@ -1,15 +1,16 @@
 """AT Protocol string format validation."""
 
 import re
+from collections.abc import Mapping
 from datetime import datetime
 from functools import wraps
-from typing import TYPE_CHECKING, Callable, Mapping, Set, Union, cast
+from typing import TYPE_CHECKING, Annotated, Callable, Union, cast
 from urllib.parse import urlparse
 
 from atproto_core.exceptions import InvalidNsidError
 from atproto_core.nsid import validate_nsid as atproto_core_validate_nsid
 from pydantic import BeforeValidator, Field, ValidationInfo
-from typing_extensions import Annotated, Literal
+from typing_extensions import Literal, TypeAliasType
 
 if TYPE_CHECKING:
     from pydantic_core import core_schema
@@ -22,7 +23,7 @@ MAX_RECORD_KEY_LENGTH: int = 512
 MAX_URI_LENGTH: int = 8 * 1024
 MIN_CID_LENGTH: int = 8
 TID_LENGTH: int = 13
-INVALID_RECORD_KEYS: Set[str] = {'.', '..'}
+INVALID_RECORD_KEYS: set[str] = {'.', '..'}
 MAX_DID_LENGTH: int = 2048  # Method-specific identifier max length
 MAX_AT_URI_LENGTH: int = 8 * 1024
 
@@ -42,7 +43,7 @@ DID_RE = re.compile(
 )
 LANG_RE = re.compile(r'^(i|[a-z]{2,3})(-[A-Za-z0-9-]+)?$')
 RKEY_RE = re.compile(r'^[A-Za-z0-9._:~-]{1,512}$')
-TID_RE = re.compile(rf'^[2-7a-z]{{{TID_LENGTH}}}$')
+TID_RE = re.compile(rf'^[234567abcdefghij][234567abcdefghijklmnopqrstuvwxyz]{{{TID_LENGTH - 1}}}$')
 CID_RE = re.compile(r'^[A-Za-z0-9+]{8,}$')
 AT_URI_RE = re.compile(
     r'^at://'  # Must start with at://
@@ -63,18 +64,35 @@ AT_URI_RE = re.compile(
 )
 
 
+def _is_strict(info: ValidationInfo) -> bool:
+    """Whether the caller opted into string format validation through the validation context.
+
+    Runs for every string format field of every model, so the common `dict` context is checked
+    without the (comparatively expensive) `Mapping` ABC lookup.
+    """
+    context = info.context if info else None
+    if isinstance(context, dict):
+        return bool(context.get(_OPT_IN_KEY, False))
+
+    return isinstance(context, Mapping) and bool(context.get(_OPT_IN_KEY, False))
+
+
 class _NamedValidator:
     """Decorator to add a __str__ attribute to a validation function."""
 
     def __init__(self, validate_fn: Callable[..., str]) -> None:
         self.validate_fn = validate_fn
+        # the opt-in gate is applied here, so skip the `only_validate_if_strict` wrapper frame
+        self._strict_fn = getattr(validate_fn, '__wrapped__', validate_fn)
 
     def __call__(self, v: str, info: ValidationInfo) -> str:
-        return self.validate_fn(v, info)
+        if _is_strict(info):
+            return cast('core_schema.WithInfoValidatorFunction', self._strict_fn)(v, info)
+        return v
 
     def __str__(self) -> str:
         func_str = f':func:`string_formats.{self.validate_fn.__name__}`'
-        return f'Validated by: {func_str} (only when `strict_string_format=True`)'
+        return f'Validated by {func_str} when `strict_string_format=True`'
 
 
 def only_validate_if_strict(validate_fn: Callable[..., str]) -> Callable[..., str]:
@@ -83,7 +101,7 @@ def only_validate_if_strict(validate_fn: Callable[..., str]) -> Callable[..., st
     @wraps(validate_fn)
     def wrapper(v: str, info: ValidationInfo) -> str:
         """Could likely be generalized to support arbitrary signatures."""
-        if info and isinstance(info.context, Mapping) and info.context.get(_OPT_IN_KEY, False):
+        if _is_strict(info):
             return cast('core_schema.WithInfoValidatorFunction', validate_fn)(v, info)
         return v
 
@@ -424,9 +442,10 @@ def validate_tid(v: str, _: ValidationInfo) -> str:
 
     - Exactly 13 characters
 
-    - Only lowercase letters and numbers 2-7
+    - Only lowercase letters and numbers 2-7 (base32-sortable alphabet)
 
-    - First byte's high bit (0x40) must be 0
+    - First character must be one of 234567abcdefghij so that the 65-bit
+      base32 encoding fits in a 64-bit integer
 
     Args:
         v: The TID to validate (e.g. 3jxtb5w2hkt2m)
@@ -437,7 +456,7 @@ def validate_tid(v: str, _: ValidationInfo) -> str:
     Raises:
         ValueError: If TID format is invalid
     """
-    if not TID_RE.match(v) or (ord(v[0]) & 0x40):
+    if not TID_RE.match(v):
         raise ValueError(f'Invalid TID: must be exactly {TID_LENGTH} lowercase letters/numbers')
     return v
 
@@ -479,23 +498,49 @@ def validate_uri(v: str, _: ValidationInfo) -> str:
     return v
 
 
-Handle = Annotated[str, BeforeValidator(_NamedValidator(validate_handle))]
-Did = Annotated[str, BeforeValidator(_NamedValidator(validate_did))]
-Nsid = Annotated[str, BeforeValidator(_NamedValidator(validate_nsid))]
-Language = Annotated[str, BeforeValidator(_NamedValidator(validate_language))]
-RecordKey = Annotated[str, BeforeValidator(_NamedValidator(validate_record_key))]
-Cid = Annotated[str, BeforeValidator(_NamedValidator(validate_cid))]
-AtUri = Annotated[str, BeforeValidator(_NamedValidator(validate_at_uri))]
-DateTime = Annotated[
-    str, BeforeValidator(_NamedValidator(validate_datetime))
-]  # see https://github.com/python-pendulum/pendulum/issues/844
-Tid = Annotated[str, BeforeValidator(_NamedValidator(validate_tid))]
-Uri = Annotated[str, BeforeValidator(_NamedValidator(validate_uri))]
+# Named aliases, so that a field documents and type-checks as its format rather than as the
+# validator wrapped around it.
+#: A handle identifier, such as ``alice.bsky.social``.
+#: Validated by :func:`validate_handle` when ``strict_string_format=True``.
+Handle = TypeAliasType('Handle', Annotated[str, BeforeValidator(_NamedValidator(validate_handle))])
+#: A decentralised identifier, such as ``did:plc:z72i7hdynmk6r22z27h6tvur``.
+#: Validated by :func:`validate_did` when ``strict_string_format=True``.
+Did = TypeAliasType('Did', Annotated[str, BeforeValidator(_NamedValidator(validate_did))])
+#: A namespaced identifier naming a lexicon, such as ``app.bsky.feed.post``.
+#: Validated by :func:`validate_nsid` when ``strict_string_format=True``.
+Nsid = TypeAliasType('Nsid', Annotated[str, BeforeValidator(_NamedValidator(validate_nsid))])
+#: An IETF language tag, such as ``en`` or ``pt-BR``.
+#: Validated by :func:`validate_language` when ``strict_string_format=True``.
+Language = TypeAliasType('Language', Annotated[str, BeforeValidator(_NamedValidator(validate_language))])
+#: The key identifying a record within its collection.
+#: Validated by :func:`validate_record_key` when ``strict_string_format=True``.
+RecordKey = TypeAliasType('RecordKey', Annotated[str, BeforeValidator(_NamedValidator(validate_record_key))])
+#: A content identifier.
+#: Validated by :func:`validate_cid` when ``strict_string_format=True``.
+Cid = TypeAliasType('Cid', Annotated[str, BeforeValidator(_NamedValidator(validate_cid))])
+#: An ``at://`` URI addressing a repository, collection, or record.
+#: Validated by :func:`validate_at_uri` when ``strict_string_format=True``.
+AtUri = TypeAliasType('AtUri', Annotated[str, BeforeValidator(_NamedValidator(validate_at_uri))])
+# see https://github.com/python-pendulum/pendulum/issues/844
+#: An ISO 8601 timestamp.
+#: Validated by :func:`validate_datetime` when ``strict_string_format=True``.
+DateTime = TypeAliasType('DateTime', Annotated[str, BeforeValidator(_NamedValidator(validate_datetime))])
+#: A timestamp identifier, the usual shape of a record key.
+#: Validated by :func:`validate_tid` when ``strict_string_format=True``.
+Tid = TypeAliasType('Tid', Annotated[str, BeforeValidator(_NamedValidator(validate_tid))])
+#: A URI with a scheme and an authority or path.
+#: Validated by :func:`validate_uri` when ``strict_string_format=True``.
+Uri = TypeAliasType('Uri', Annotated[str, BeforeValidator(_NamedValidator(validate_uri))])
 
-AtIdentifier = Union[Handle, Did]
+#: Either a :obj:`Handle` or a :obj:`Did`.
+AtIdentifier = TypeAliasType('AtIdentifier', Union[Handle, Did])
 
 # Any valid ATProto string format
-AtProtoString = Annotated[
-    Union[Handle, Did, Nsid, AtUri, Cid, DateTime, Tid, RecordKey, Uri, Language],
-    Field(description='ATProto string format'),
-]
+#: Any of the AT Protocol string formats.
+AtProtoString = TypeAliasType(
+    'AtProtoString',
+    Annotated[
+        Union[Handle, Did, Nsid, AtUri, Cid, DateTime, Tid, RecordKey, Uri, Language],
+        Field(description='ATProto string format'),
+    ],
+)

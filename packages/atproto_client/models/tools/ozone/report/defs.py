@@ -7,7 +7,6 @@
 
 import typing as t
 
-import typing_extensions as te
 from pydantic import Field
 
 from atproto_client.models import string_formats
@@ -15,7 +14,7 @@ from atproto_client.models import string_formats
 if t.TYPE_CHECKING:
     from atproto_client import models
     from atproto_client.models.unknown_type import UnknownType
-from atproto_client.models import base
+from atproto_client.models import base, unknown_union
 
 ReasonType = t.Union[
     'models.ToolsOzoneReportDefs.ReasonAppeal',
@@ -190,7 +189,7 @@ class ReportView(base.ModelBase):
     reported_by: string_formats.Did  #: DID of the user who made the report.
     reporter: 'models.ToolsOzoneModerationDefs.SubjectView'  #: Full subject view of the reporter account.
     status: t.Union[
-        t.Literal['open'], t.Literal['closed'], t.Literal['escalated'], t.Literal['queued'], t.Literal['assigned'], str
+        t.Literal['open', 'closed', 'escalated', 'queued', 'assigned'], str
     ]  #: Current status of the report.
     subject: 'models.ToolsOzoneModerationDefs.SubjectView'  #: The subject that was reported with full details.
     action_event_ids: t.Optional[t.List[int]] = (
@@ -204,6 +203,7 @@ class ReportView(base.ModelBase):
         None  #: Information about moderator currently assigned to this report (if any).
     )
     comment: t.Optional[str] = None  #: Comment provided by the reporter.
+    is_automated: t.Optional[bool] = False  #: Whether this report was emitted by automated tooling.
     is_muted: t.Optional[bool] = (
         None  #: Whether this report is muted. A report is muted if the reporter was muted or the subject was muted at the time the report was created.
     )
@@ -223,16 +223,9 @@ class ReportView(base.ModelBase):
 class QueueActivity(base.ModelBase):
     """Definition model for :obj:`tools.ozone.report.defs`. Activity recording a report being routed to a queue."""
 
-    previous_status: t.Optional[
-        t.Union[
-            t.Literal['open'],
-            t.Literal['closed'],
-            t.Literal['escalated'],
-            t.Literal['queued'],
-            t.Literal['assigned'],
-            str,
-        ]
-    ] = None  #: The report's status before this activity. Populated automatically from the report row; not required in input.
+    previous_status: t.Optional[t.Union[t.Literal['open', 'closed', 'escalated', 'queued', 'assigned'], str]] = (
+        None  #: The report's status before this activity. Populated automatically from the report row; not required in input.
+    )
 
     py_type: t.Literal['tools.ozone.report.defs#queueActivity'] = Field(
         default='tools.ozone.report.defs#queueActivity', alias='$type', frozen=True
@@ -242,16 +235,9 @@ class QueueActivity(base.ModelBase):
 class AssignmentActivity(base.ModelBase):
     """Definition model for :obj:`tools.ozone.report.defs`. Activity recording a moderator being assigned to a report."""
 
-    previous_status: t.Optional[
-        t.Union[
-            t.Literal['open'],
-            t.Literal['closed'],
-            t.Literal['escalated'],
-            t.Literal['queued'],
-            t.Literal['assigned'],
-            str,
-        ]
-    ] = None  #: The report's status before this activity. Populated automatically from the report row; not required in input.
+    previous_status: t.Optional[t.Union[t.Literal['open', 'closed', 'escalated', 'queued', 'assigned'], str]] = (
+        None  #: The report's status before this activity. Populated automatically from the report row; not required in input.
+    )
 
     py_type: t.Literal['tools.ozone.report.defs#assignmentActivity'] = Field(
         default='tools.ozone.report.defs#assignmentActivity', alias='$type', frozen=True
@@ -261,16 +247,9 @@ class AssignmentActivity(base.ModelBase):
 class EscalationActivity(base.ModelBase):
     """Definition model for :obj:`tools.ozone.report.defs`. Activity recording a report being escalated."""
 
-    previous_status: t.Optional[
-        t.Union[
-            t.Literal['open'],
-            t.Literal['closed'],
-            t.Literal['escalated'],
-            t.Literal['queued'],
-            t.Literal['assigned'],
-            str,
-        ]
-    ] = None  #: The report's status before this activity. Populated automatically from the report row; not required in input.
+    previous_status: t.Optional[t.Union[t.Literal['open', 'closed', 'escalated', 'queued', 'assigned'], str]] = (
+        None  #: The report's status before this activity. Populated automatically from the report row; not required in input.
+    )
 
     py_type: t.Literal['tools.ozone.report.defs#escalationActivity'] = Field(
         default='tools.ozone.report.defs#escalationActivity', alias='$type', frozen=True
@@ -280,16 +259,9 @@ class EscalationActivity(base.ModelBase):
 class CloseActivity(base.ModelBase):
     """Definition model for :obj:`tools.ozone.report.defs`. Activity recording a report being closed."""
 
-    previous_status: t.Optional[
-        t.Union[
-            t.Literal['open'],
-            t.Literal['closed'],
-            t.Literal['escalated'],
-            t.Literal['queued'],
-            t.Literal['assigned'],
-            str,
-        ]
-    ] = None  #: The report's status before this activity. Populated automatically from the report row; not required in input.
+    previous_status: t.Optional[t.Union[t.Literal['open', 'closed', 'escalated', 'queued', 'assigned'], str]] = (
+        None  #: The report's status before this activity. Populated automatically from the report row; not required in input.
+    )
 
     py_type: t.Literal['tools.ozone.report.defs#closeActivity'] = Field(
         default='tools.ozone.report.defs#closeActivity', alias='$type', frozen=True
@@ -299,16 +271,9 @@ class CloseActivity(base.ModelBase):
 class ReopenActivity(base.ModelBase):
     """Definition model for :obj:`tools.ozone.report.defs`. Activity recording a closed report being reopened. Only valid when the report is in 'closed' status."""
 
-    previous_status: t.Optional[
-        t.Union[
-            t.Literal['open'],
-            t.Literal['closed'],
-            t.Literal['escalated'],
-            t.Literal['queued'],
-            t.Literal['assigned'],
-            str,
-        ]
-    ] = None  #: The report's status before this activity. Populated automatically from the report row; not required in input.
+    previous_status: t.Optional[t.Union[t.Literal['open', 'closed', 'escalated', 'queued', 'assigned'], str]] = (
+        None  #: The report's status before this activity. Populated automatically from the report row; not required in input.
+    )
 
     py_type: t.Literal['tools.ozone.report.defs#reopenActivity'] = Field(
         default='tools.ozone.report.defs#reopenActivity', alias='$type', frozen=True
@@ -326,7 +291,7 @@ class NoteActivity(base.ModelBase):
 class ReportActivityView(base.ModelBase):
     """Definition model for :obj:`tools.ozone.report.defs`. A single activity entry on a report."""
 
-    activity: te.Annotated[
+    activity: unknown_union.OpenUnion[
         t.Union[
             'models.ToolsOzoneReportDefs.QueueActivity',
             'models.ToolsOzoneReportDefs.AssignmentActivity',
@@ -334,8 +299,7 @@ class ReportActivityView(base.ModelBase):
             'models.ToolsOzoneReportDefs.CloseActivity',
             'models.ToolsOzoneReportDefs.ReopenActivity',
             'models.ToolsOzoneReportDefs.NoteActivity',
-        ],
-        Field(discriminator='py_type'),
+        ]
     ]  #: The typed activity object describing what occurred.
     created_at: string_formats.DateTime  #: When this activity was created.
     created_by: (

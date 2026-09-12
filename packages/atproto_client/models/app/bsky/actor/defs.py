@@ -15,7 +15,7 @@ from atproto_client.models import string_formats
 if t.TYPE_CHECKING:
     from atproto_client import models
     from atproto_client.models.unknown_type import UnknownType
-from atproto_client.models import base
+from atproto_client.models import base, unknown_union
 
 
 class ProfileViewBasic(base.ModelBase):
@@ -115,10 +115,8 @@ class ProfileAssociated(base.ModelBase):
 class ProfileAssociatedChat(base.ModelBase):
     """Definition model for :obj:`app.bsky.actor.defs`."""
 
-    allow_incoming: t.Union[t.Literal['all'], t.Literal['none'], t.Literal['following'], str]  #: Allow incoming.
-    allow_group_invites: t.Optional[t.Union[t.Literal['all'], t.Literal['none'], t.Literal['following'], str]] = (
-        None  #: Allow group invites.
-    )
+    allow_incoming: t.Union[t.Literal['all', 'none', 'following'], str]  #: Allow incoming.
+    allow_group_invites: t.Optional[t.Union[t.Literal['all', 'none', 'following'], str]] = None  #: Allow group invites.
 
     py_type: t.Literal['app.bsky.actor.defs#profileAssociatedChat'] = Field(
         default='app.bsky.actor.defs#profileAssociatedChat', alias='$type', frozen=True
@@ -129,7 +127,7 @@ class ProfileAssociatedGerm(base.ModelBase):
     """Definition model for :obj:`app.bsky.actor.defs`."""
 
     message_me_url: string_formats.Uri  #: Message me url.
-    show_button_to: t.Union[t.Literal['usersIFollow'], t.Literal['everyone'], str]  #: Show button to.
+    show_button_to: t.Union[t.Literal['usersIFollow', 'everyone'], str]  #: Show button to.
 
     py_type: t.Literal['app.bsky.actor.defs#profileAssociatedGerm'] = Field(
         default='app.bsky.actor.defs#profileAssociatedGerm', alias='$type', frozen=True
@@ -139,9 +137,7 @@ class ProfileAssociatedGerm(base.ModelBase):
 class ProfileAssociatedActivitySubscription(base.ModelBase):
     """Definition model for :obj:`app.bsky.actor.defs`."""
 
-    allow_subscriptions: t.Union[
-        t.Literal['followers'], t.Literal['mutuals'], t.Literal['none'], str
-    ]  #: Allow subscriptions.
+    allow_subscriptions: t.Union[t.Literal['followers', 'mutuals', 'none'], str]  #: Allow subscriptions.
 
     py_type: t.Literal['app.bsky.actor.defs#profileAssociatedActivitySubscription'] = Field(
         default='app.bsky.actor.defs#profileAssociatedActivitySubscription', alias='$type', frozen=True
@@ -162,8 +158,16 @@ class ViewerState(base.ModelBase):
     known_followers: t.Optional['models.AppBskyActorDefs.KnownFollowers'] = (
         None  #: This property is present only in selected cases, as an optimization.
     )
-    muted: t.Optional[bool] = None  #: Muted.
+    muted: t.Optional[bool] = (
+        None  #: Whether the account is fully muted, directly or via a mutelist. False when the mute is scoped to specific kinds; see mutedOnlyReposts and mutedOnlyQuoteposts.
+    )
     muted_by_list: t.Optional['models.AppBskyGraphDefs.ListViewBasic'] = None  #: Muted by list.
+    muted_only_quoteposts: t.Optional[bool] = (
+        None  #: Whether the account's quote posts are muted. Scoped mutes are exclusive with muted: this can be true while muted is false. If muted is true, this will be false.
+    )
+    muted_only_reposts: t.Optional[bool] = (
+        None  #: Whether the account's reposts are muted. Scoped mutes are exclusive with muted: this can be true while muted is false. If muted is true, this will be false.
+    )
 
     py_type: t.Literal['app.bsky.actor.defs#viewerState'] = Field(
         default='app.bsky.actor.defs#viewerState', alias='$type', frozen=True
@@ -185,14 +189,12 @@ class VerificationState(base.ModelBase):
     """Definition model for :obj:`app.bsky.actor.defs`. Represents the verification information about the user this object is attached to."""
 
     trusted_verifier_status: t.Union[
-        t.Literal['valid'], t.Literal['invalid'], t.Literal['none'], str
+        t.Literal['valid', 'invalid', 'none'], str
     ]  #: The user's status as a trusted verifier.
     verifications: t.List[
         'models.AppBskyActorDefs.VerificationView'
     ]  #: All verifications issued by trusted verifiers on behalf of this user. Verifications by untrusted verifiers are not included.
-    verified_status: t.Union[
-        t.Literal['valid'], t.Literal['invalid'], t.Literal['none'], str
-    ]  #: The user's status as a verified account.
+    verified_status: t.Union[t.Literal['valid', 'invalid', 'none'], str]  #: The user's status as a verified account.
 
     py_type: t.Literal['app.bsky.actor.defs#verificationState'] = Field(
         default='app.bsky.actor.defs#verificationState', alias='$type', frozen=True
@@ -215,7 +217,7 @@ class VerificationView(base.ModelBase):
 
 
 Preferences = t.List[
-    te.Annotated[
+    unknown_union.OpenUnion[
         t.Union[
             'models.AppBskyActorDefs.AdultContentPref',
             'models.AppBskyActorDefs.ContentLabelPref',
@@ -233,8 +235,7 @@ Preferences = t.List[
             'models.AppBskyActorDefs.PostInteractionSettingsPref',
             'models.AppBskyActorDefs.VerificationPrefs',
             'models.AppBskyActorDefs.LiveEventPreferences',
-        ],
-        Field(discriminator='py_type'),
+        ]
     ]
 ]
 
@@ -253,9 +254,7 @@ class ContentLabelPref(base.ModelBase):
     """Definition model for :obj:`app.bsky.actor.defs`."""
 
     label: str  #: Label.
-    visibility: t.Union[
-        t.Literal['ignore'], t.Literal['show'], t.Literal['warn'], t.Literal['hide'], str
-    ]  #: Visibility.
+    visibility: t.Union[t.Literal['ignore', 'show', 'warn', 'hide'], str]  #: Visibility.
     labeler_did: t.Optional[string_formats.Did] = (
         None  #: Which labeler does this preference apply to? If undefined, applies globally.
     )
@@ -270,7 +269,7 @@ class SavedFeed(base.ModelBase):
 
     id: str  #: Id.
     pinned: bool  #: Pinned.
-    type: t.Union[t.Literal['feed'], t.Literal['list'], t.Literal['timeline'], str]  #: Type.
+    type: t.Union[t.Literal['feed', 'list', 'timeline'], str]  #: Type.
     value: str  #: Value.
 
     py_type: t.Literal['app.bsky.actor.defs#savedFeed'] = Field(
@@ -342,16 +341,9 @@ class FeedViewPref(base.ModelBase):
 class ThreadViewPref(base.ModelBase):
     """Definition model for :obj:`app.bsky.actor.defs`."""
 
-    sort: t.Optional[
-        t.Union[
-            t.Literal['oldest'],
-            t.Literal['newest'],
-            t.Literal['most-likes'],
-            t.Literal['random'],
-            t.Literal['hotness'],
-            str,
-        ]
-    ] = None  #: Sorting mode for threads.
+    sort: t.Optional[t.Union[t.Literal['oldest', 'newest', 'most-likes', 'random', 'hotness'], str]] = (
+        None  #: Sorting mode for threads.
+    )
 
     py_type: t.Literal['app.bsky.actor.defs#threadViewPref'] = Field(
         default='app.bsky.actor.defs#threadViewPref', alias='$type', frozen=True
@@ -361,16 +353,19 @@ class ThreadViewPref(base.ModelBase):
 class InterestsPref(base.ModelBase):
     """Definition model for :obj:`app.bsky.actor.defs`."""
 
-    tags: t.List[str] = Field(
+    tags: t.List[te.Annotated[str, Field(max_length=640)]] = Field(
         max_length=100
     )  #: A list of tags which describe the account owner's interests gathered during onboarding.
+    updated_at: t.Optional[string_formats.DateTime] = (
+        None  #: The timestamp when the account owner last updated their interests.
+    )
 
     py_type: t.Literal['app.bsky.actor.defs#interestsPref'] = Field(
         default='app.bsky.actor.defs#interestsPref', alias='$type', frozen=True
     )
 
 
-MutedWordTarget = t.Union[t.Literal['content'], t.Literal['tag'], str]  #: Muted word target
+MutedWordTarget = t.Union[t.Literal['content', 'tag'], str]  #: Muted word target
 
 
 class MutedWord(base.ModelBase):
@@ -378,7 +373,7 @@ class MutedWord(base.ModelBase):
 
     targets: t.List['models.AppBskyActorDefs.MutedWordTarget']  #: The intended targets of the muted word.
     value: str = Field(max_length=10000)  #: The muted word itself.
-    actor_target: t.Optional[t.Union[t.Literal['all'], t.Literal['exclude-following'], str]] = (
+    actor_target: t.Optional[t.Union[t.Literal['all', 'exclude-following'], str]] = (
         'all'  #: Groups of users to apply the muted word to. If undefined, applies to all users.
     )
     expires_at: t.Optional[string_formats.DateTime] = (
@@ -435,12 +430,13 @@ class BskyAppStatePref(base.ModelBase):
     """Definition model for :obj:`app.bsky.actor.defs`. A grab bag of state that's specific to the bsky.app program. Third-party apps shouldn't use this."""
 
     active_progress_guide: t.Optional['models.AppBskyActorDefs.BskyAppProgressGuide'] = None  #: Active progress guide.
+    is_beta_user: t.Optional[bool] = None  #: Indicates if the user is participating in the beta features program.
     nuxs: te.Annotated[t.Optional[t.List['models.AppBskyActorDefs.Nux']], Field(max_length=100)] = (
         None  #: Storage for NUXs the user has encountered.
     )
-    queued_nudges: te.Annotated[t.Optional[t.List[str]], Field(max_length=1000)] = (
-        None  #: An array of tokens which identify nudges (modals, popups, tours, highlight dots) that should be shown to the user.
-    )
+    queued_nudges: te.Annotated[
+        t.Optional[t.List[te.Annotated[str, Field(max_length=100)]]], Field(max_length=1000)
+    ] = None  #: An array of tokens which identify nudges (modals, popups, tours, highlight dots) that should be shown to the user.
 
     py_type: t.Literal['app.bsky.actor.defs#bskyAppStatePref'] = Field(
         default='app.bsky.actor.defs#bskyAppStatePref', alias='$type', frozen=True
@@ -496,26 +492,24 @@ class LiveEventPreferences(base.ModelBase):
 class PostInteractionSettingsPref(base.ModelBase):
     """Definition model for :obj:`app.bsky.actor.defs`. Default post interaction settings for the account. These values should be applied as default values when creating new posts. These refs should mirror the threadgate and postgate records exactly."""
 
-    postgate_embedding_rules: t.Optional[
-        t.List[te.Annotated[t.Union['models.AppBskyFeedPostgate.DisableRule'], Field(discriminator='py_type')]]
-    ] = Field(
-        max_length=5
-    )  #: Matches postgate record. List of rules defining who can embed this users posts. If value is an empty array or is undefined, no particular rules apply and anyone can embed.
-    threadgate_allow_rules: t.Optional[
-        t.List[
-            te.Annotated[
-                t.Union[
-                    'models.AppBskyFeedThreadgate.MentionRule',
-                    'models.AppBskyFeedThreadgate.FollowerRule',
-                    'models.AppBskyFeedThreadgate.FollowingRule',
-                    'models.AppBskyFeedThreadgate.ListRule',
-                ],
-                Field(discriminator='py_type'),
+    postgate_embedding_rules: te.Annotated[
+        t.Optional[t.List[unknown_union.OpenUnion['models.AppBskyFeedPostgate.DisableRule']]], Field(max_length=5)
+    ] = None  #: Matches postgate record. List of rules defining who can embed this users posts. If value is an empty array or is undefined, no particular rules apply and anyone can embed.
+    threadgate_allow_rules: te.Annotated[
+        t.Optional[
+            t.List[
+                unknown_union.OpenUnion[
+                    t.Union[
+                        'models.AppBskyFeedThreadgate.MentionRule',
+                        'models.AppBskyFeedThreadgate.FollowerRule',
+                        'models.AppBskyFeedThreadgate.FollowingRule',
+                        'models.AppBskyFeedThreadgate.ListRule',
+                    ]
+                ]
             ]
-        ]
-    ] = Field(
-        max_length=5
-    )  #: Matches threadgate record. List of rules defining who can reply to this users posts. If value is an empty array, no one can reply. If value is undefined, anyone can reply.
+        ],
+        Field(max_length=5),
+    ] = None  #: Matches threadgate record. List of rules defining who can reply to this users posts. If value is an empty array, no one can reply. If value is undefined, anyone can reply.
 
     py_type: t.Literal['app.bsky.actor.defs#postInteractionSettingsPref'] = Field(
         default='app.bsky.actor.defs#postInteractionSettingsPref', alias='$type', frozen=True
@@ -528,7 +522,7 @@ class StatusView(base.ModelBase):
     record: 'UnknownType'  #: Record.
     status: t.Union['models.AppBskyActorStatus.Live', str]  #: The status for the account.
     cid: t.Optional[string_formats.Cid] = None  #: Cid.
-    embed: t.Optional[te.Annotated[t.Union['models.AppBskyEmbedExternal.View'], Field(discriminator='py_type')]] = (
+    embed: t.Optional[unknown_union.OpenUnion['models.AppBskyEmbedExternal.View']] = (
         None  #: An optional embed associated with the status.
     )
     expires_at: t.Optional[string_formats.DateTime] = (
